@@ -28,15 +28,28 @@ def runs_root() -> Path:
     return d
 
 
-def run_dir() -> Path:
+def run_dir(mode: str | None = None) -> Path:
+    """Today's run directory for a mode: runs/<date>/open or runs/<date>/closed, so the two
+    loops' results sit side by side and can be compared. With the lab off, the date directory."""
+    mode = mode or get_settings().mode
     d = runs_root() / dt.date.today().isoformat()
+    if mode in ("open", "closed"):
+        d = d / mode
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
+def latest_page(mode: str | None = None) -> Path | None:
+    """The most recently written newsletter page, optionally restricted to one loop."""
+    pages = [p for p in runs_root().glob("*/*/newsletter*.html") if not mode or p.parent.name == mode]
+    pages += [p for p in runs_root().glob("*/newsletter*.html") if not mode]   # pre-split layout
+    pages = [p for p in pages if p.name == "newsletter.html"]
+    return max(pages, key=lambda p: p.stat().st_mtime) if pages else None
+
+
 def latest_run_dir() -> Path | None:
-    dirs = sorted(p for p in runs_root().iterdir() if p.is_dir())
-    return dirs[-1] if dirs else None
+    p = latest_page()
+    return p.parent if p else None
 
 
 def open_in_browser(path: Path) -> bool:

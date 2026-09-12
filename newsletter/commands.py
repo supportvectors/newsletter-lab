@@ -4,7 +4,8 @@
     /newsletter open       arm the open loop (no verifiers)
     /newsletter closed     arm the closed loop (verifier after every step)
     /newsletter off        hide the lab's tools
-    /newsletter show       open the latest newsletter.html
+    /newsletter show [open|closed]   open the latest newsletter.html (of that loop)
+    /newsletter compare    open today's open-loop and closed-loop pages side by side
     /newsletter where      print today's run directory
     /newsletter autoopen on|off
 """
@@ -13,7 +14,7 @@ from __future__ import annotations
 
 import shlex
 
-from .paths import latest_run_dir, open_in_browser, run_dir
+from .paths import latest_page, open_in_browser, run_dir
 from .settings import get_settings, update_settings
 
 
@@ -48,11 +49,20 @@ def handle_command(raw_args: str) -> str:
     if cmd == "where":
         return str(run_dir())
     if cmd == "show":
-        d = latest_run_dir()
-        p = d / "newsletter.html" if d else None
-        if not p or not p.exists():
-            return "No newsletter has been rendered yet."
+        which = arg.lower() if arg.lower() in ("open", "closed") else None
+        p = latest_page(which)
+        if not p:
+            return f"No {which + '-loop ' if which else ''}newsletter has been rendered yet."
         return f"Opening {p}" if open_in_browser(p) else f"Could not launch a browser; the page is at {p}"
+    if cmd == "compare":
+        out = []
+        for which in ("open", "closed"):
+            p = run_dir(which) / "newsletter.html"
+            if p.exists():
+                out.append(f"{which:6s} {p}" + ("" if open_in_browser(p) else "   (could not launch a browser)"))
+            else:
+                out.append(f"{which:6s} — not rendered today")
+        return "Today's pages:\n  " + "\n  ".join(out)
     if cmd == "autoopen":
         on = arg.lower() in ("on", "1", "true", "yes")
         s = update_settings(open_page=on)

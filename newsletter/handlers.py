@@ -140,8 +140,11 @@ def render_page(args: dict, **kwargs: Any) -> str:
     if not (d / "draft.md").exists() or not (d / "items.json").exists():
         return _err("render_page needs a saved digest and draft.")
     p = d / "newsletter.html"
+    if p.exists() and not (d / "newsletter-by-model.html").exists():
+        p.rename(d / "newsletter-by-model.html")     # keep the model's page for comparison
     _render.render(str(d / "draft.md"), str(d / "items.json"), str(p), str(TEMPLATE),
                    title=args.get("title") or "Five Things Worth Reading")
     out = _finish_page(p)
-    out["note"] = "Rendered by code, not by the model: the template cannot be left half-filled."
+    out["note"] = ("Rendered by code, not by the model: the template cannot be left half-filled. "
+                   "The page the model rendered earlier, if any, is kept beside it as newsletter-by-model.html.")
     return json.dumps(out)

@@ -60,6 +60,6 @@ def register(ctx) -> None:
                 ctx.register_skill(child.name, skill_md)
 
     ctx.register_command("newsletter", commands.handle_command,
-                         description="Newsletter lab: /newsletter open|closed|off|status|show|where",
-                         args_hint="<open|closed|off|status|show|where>")
+                         description="Newsletter lab: /newsletter open|closed|off|status|show [open|closed]|compare|where",
+                         args_hint="<open|closed|off|status|show|compare|where>")
     logger.info("newsletter-lab registered: 8 tools, 1 hook, 6 skills")

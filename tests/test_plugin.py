@@ -13,7 +13,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+    sys.path.append(str(ROOT))   # append, not insert: the lab's tools/ must not shadow Hermes' own tools package
 
 from newsletter import handlers, hooks, settings  # noqa: E402
 from newsletter import paths as paths_mod  # noqa: E402
@@ -160,3 +160,41 @@ def test_discovery_and_slash_command(tmp_path, monkeypatch):
         mgr.unload_all()
     except Exception:
         pass
+
+
+# -- open and closed runs live side by side ---------------------------------------------------
+
+def test_runs_split_by_mode_and_compare(lab):
+    settings.update_settings(mode="open")
+    f = json.loads(handlers.fetch_sources({}))
+    items = _pick(f["candidates"])
+    handlers.save_digest({"items": items}); handlers.save_draft({"markdown": _draft(items)})
+    open_dir = paths_mod.run_dir()
+    assert open_dir.name == "open" and (open_dir / "draft.md").exists()
+    settings.update_settings(mode="closed")
+    closed_dir = paths_mod.run_dir()
+    assert closed_dir.name == "closed" and closed_dir.parent == open_dir.parent
+    assert not (closed_dir / "draft.md").exists()          # the closed run starts clean
+    handlers.fetch_sources({}); handlers.save_digest({"items": items}); handlers.save_draft({"markdown": _draft(items)})
+    handlers.render_page({})
+    assert (closed_dir / "newsletter.html").exists() and (open_dir / "draft.md").exists()
+    from newsletter import commands
+    out = commands.handle_command("compare")
+    assert "open   — not rendered today" in out and str(closed_dir / "newsletter.html") in out
+    assert paths_mod.latest_page("closed") == closed_dir / "newsletter.html"
+    assert paths_mod.latest_page("open") is None
+    assert "No open-loop newsletter" in commands.handle_command("show open")
+
+
+def test_mechanical_render_keeps_the_models_page(lab):
+    f = json.loads(handlers.fetch_sources({}))
+    items = _pick(f["candidates"])
+    handlers.save_digest({"items": items}); handlers.save_draft({"markdown": _draft(items)})
+    handlers.render_page({})
+    d = paths_mod.run_dir()
+    by_model = (d / "newsletter.html").read_text().replace("Read the original", "Read it")
+    handlers.save_page({"html": by_model})
+    out = json.loads(handlers.render_page({}))
+    assert (d / "newsletter-by-model.html").read_text() == by_model
+    assert "Read the original" in (d / "newsletter.html").read_text()
+    assert "newsletter-by-model.html" in out["note"]
