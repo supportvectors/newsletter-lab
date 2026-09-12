@@ -1,0 +1,10 @@
+[project]
+name = "newsletter-lab"
+version = "0.1.0"
+description = "The Newsletter Lab: three Hermes skills, three verifiers, one afternoon. Companion to the Steam-Engine Reliability Lab."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8"]
