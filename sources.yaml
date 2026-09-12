@@ -1,0 +1,53 @@
+# The named sources the research skill may draw from — and ONLY these.
+# kind: rss | atom | hn | arxiv | html
+# The verifier's allow-list is derived from the `host` fields below.
+window_days: 14          # how far back an item may be dated
+max_per_source: 12       # candidates kept per source (newest first)
+
+sources:
+  - name: OpenAI News
+    kind: rss
+    url: https://openai.com/news/rss.xml
+    host: openai.com
+  - name: Google Research
+    kind: rss
+    url: https://research.google/blog/rss/
+    host: research.google
+  - name: Google DeepMind
+    kind: rss
+    url: https://deepmind.google/blog/rss.xml
+    host: deepmind.google
+  - name: Microsoft Research
+    kind: rss
+    url: https://www.microsoft.com/en-us/research/feed/
+    host: microsoft.com
+  - name: Hugging Face Blog
+    kind: rss
+    url: https://huggingface.co/blog/feed.xml
+    host: huggingface.co
+  - name: arXiv cs.AI
+    kind: rss
+    url: https://rss.arxiv.org/rss/cs.AI
+    host: arxiv.org
+  - name: arXiv cs.CL
+    kind: rss
+    url: https://rss.arxiv.org/rss/cs.CL
+    host: arxiv.org
+  - name: Hacker News
+    kind: hn
+    url: https://hacker-news.firebaseio.com/v0/topstories.json
+    host: news.ycombinator.com
+    keywords: [ai, llm, agent, model, gpt, claude, gemini, transformer, neural, inference, rag, "open source", robot]
+  # Two sources with no feed: the fetcher scrapes their index page for links.
+  # They fail more often than the feeds do. That is not an accident — watch what the
+  # model does when a named source returns nothing.
+  - name: Anthropic
+    kind: html
+    url: https://www.anthropic.com/news
+    host: anthropic.com
+    link_prefix: /news/
+  - name: Meta AI
+    kind: html
+    url: https://ai.meta.com/blog/
+    host: ai.meta.com
+    link_prefix: /blog/

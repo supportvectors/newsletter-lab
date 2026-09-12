@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+  :root { --paper: #f5eedc; --ink: #2a2118; --ink-2: #5b4d3f; --rule: #cbbd9c; --brass: #b8862b; --oxblood: #9b2d20; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+         font: 17px/1.55 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+  .page { max-width: 720px; margin: 0 auto; padding: 44px 28px 60px; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 26px; }
+  .kicker { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); }
+  h1 { font-size: 34px; font-weight: 600; margin: 6px 0 4px; }
+  .date { color: var(--ink-2); font-size: 14px; }
+  .intro { font-size: 18px; color: var(--ink-2); font-style: italic; border-left: 3px solid var(--brass); padding-left: 16px; margin: 0 0 30px; }
+  article { margin: 0 0 30px; padding-bottom: 22px; border-bottom: 1px solid var(--rule); }
+  article h2 { font-size: 22px; margin: 0 0 4px; }
+  article .src { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--brass); margin-bottom: 8px; }
+  article p { margin: 0 0 10px; }
+  article a.more { color: var(--oxblood); text-decoration: none; border-bottom: 1px solid var(--rule); font-size: 15px; }
+  footer { font-size: 12.5px; color: var(--ink-2); margin-top: 36px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="kicker">{{KICKER}}</div>
+    <h1>{{TITLE}}</h1>
+    <div class="date">{{DATE}}</div>
+  </header>
+
+  <p class="intro">{{INTRO}}</p>
+
+  <!-- ITEM START — repeat this block once per item, in order; remove these two marker comments when done -->
+  <article>
+    <div class="src">{{ITEM_SOURCE}}</div>
+    <h2>{{ITEM_TITLE}}</h2>
+    <p>{{ITEM_BODY}}</p>
+    <a class="more" href="{{ITEM_URL}}">Read the original →</a>
+  </article>
+  <!-- ITEM END -->
+
+  <footer>{{FOOTER}}</footer>
+</div>
+</body>
+</html>
