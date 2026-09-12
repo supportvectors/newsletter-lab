@@ -38,21 +38,14 @@ def resolves(url: str) -> tuple[bool, str]:
         return False, f"{type(e).__name__}"
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("items")
-    ap.add_argument("candidates")
-    ap.add_argument("--offline", action="store_true", help="skip the live URL check")
-    ap.add_argument("--required", type=int, default=REQUIRED)
-    args = ap.parse_args()
-
+def verify(items_path: str, candidates_path: str, offline: bool = False, required: int = REQUIRED) -> dict:
+    """Return the verdict dict (``verdict`` is 'pass' or 'fail')."""
     problems: list[dict] = []
     try:
-        chosen = json.loads(Path(args.items).read_text(encoding="utf-8"))
-        cands = json.loads(Path(args.candidates).read_text(encoding="utf-8"))
+        chosen = json.loads(Path(items_path).read_text(encoding="utf-8"))
+        cands = json.loads(Path(candidates_path).read_text(encoding="utf-8"))
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"verdict": "fail", "problems": [{"item": None, "reason": f"cannot read inputs: {e}"}]}))
-        return 1
+        return {"verdict": "fail", "problems": [{"item": None, "reason": f"cannot read inputs: {e}"}]}
 
     items = chosen.get("items") if isinstance(chosen, dict) else chosen
     if not isinstance(items, list):
@@ -62,8 +55,8 @@ def main() -> int:
     window = int(cands.get("window_days", 14))
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=window)
 
-    if len(items) != args.required:
-        problems.append({"item": None, "reason": f"expected exactly {args.required} items, got {len(items)}"})
+    if len(items) != required:
+        problems.append({"item": None, "reason": f"expected exactly {required} items, got {len(items)}"})
 
     seen_urls, seen_sources = set(), {}
     for i, it in enumerate(items, 1):
@@ -77,7 +70,8 @@ def main() -> int:
         if not url:
             problems.append({"item": tag, "reason": "missing url"})
             continue
-        host = urllib.parse.urlparse(url).netloc.lower().removeprefix("www.")
+        host = urllib.parse.urlparse(url).netloc.lower()
+        host = host[4:] if host.startswith("www.") else host
         if url in seen_urls:
             problems.append({"item": tag, "reason": "duplicate url"})
         seen_urls.add(url)
@@ -94,7 +88,7 @@ def main() -> int:
             seen_sources[c.get("source")] = seen_sources.get(c.get("source"), 0) + 1
         if len(why.split()) < MIN_WHY_WORDS:
             problems.append({"item": tag, "reason": f"'why' must be at least {MIN_WHY_WORDS} words of your own reasoning"})
-        if not args.offline and url in issued:
+        if not offline and url in issued:
             ok, note = resolves(url)
             if not ok:
                 problems.append({"item": tag, "reason": f"url does not resolve ({note})"})
@@ -104,8 +98,19 @@ def main() -> int:
     if problems:
         verdict["instruction"] = ("Fix ONLY the items named above and run this verifier again. Do not invent a URL: "
                                   "pick a different candidate from candidates.json.")
+    return verdict
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("items")
+    ap.add_argument("candidates")
+    ap.add_argument("--offline", action="store_true", help="skip the live URL check")
+    ap.add_argument("--required", type=int, default=REQUIRED)
+    args = ap.parse_args()
+    verdict = verify(args.items, args.candidates, offline=args.offline, required=args.required)
     print(json.dumps(verdict, indent=2))
-    return 0 if not problems else 1
+    return 0 if verdict["verdict"] == "pass" else 1
 
 
 if __name__ == "__main__":

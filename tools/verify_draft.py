@@ -27,18 +27,14 @@ QUOTE_RE = re.compile(r"[\"“]([^\"”]{40,})[\"”]")
 BOILERPLATE = ("as an ai", "i cannot", "i can't", "i'm unable", "i am unable", "unfortunately i", "i don't have access")
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("draft")
-    ap.add_argument("items")
-    args = ap.parse_args()
+def verify(draft_path: str, items_path: str) -> dict:
+    """Return the verdict dict (``verdict`` is 'pass' or 'fail')."""
     problems: list[dict] = []
     try:
-        text = Path(args.draft).read_text(encoding="utf-8")
-        chosen = json.loads(Path(args.items).read_text(encoding="utf-8"))
+        text = Path(draft_path).read_text(encoding="utf-8")
+        chosen = json.loads(Path(items_path).read_text(encoding="utf-8"))
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"verdict": "fail", "problems": [{"where": None, "reason": f"cannot read inputs: {e}"}]}))
-        return 1
+        return {"verdict": "fail", "problems": [{"where": None, "reason": f"cannot read inputs: {e}"}]}
     items = chosen.get("items") if isinstance(chosen, dict) else chosen
     by_url = {it["url"].strip(): it for it in items}
 
@@ -95,8 +91,17 @@ def main() -> int:
     verdict = {"verdict": "pass" if not problems else "fail", "words": words, "sections": len(sections), "problems": problems}
     if problems:
         verdict["instruction"] = "Fix ONLY the sections named above, keep everything else, and run this verifier again."
+    return verdict
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("draft")
+    ap.add_argument("items")
+    args = ap.parse_args()
+    verdict = verify(args.draft, args.items)
     print(json.dumps(verdict, indent=2))
-    return 0 if not problems else 1
+    return 0 if verdict["verdict"] == "pass" else 1
 
 
 if __name__ == "__main__":

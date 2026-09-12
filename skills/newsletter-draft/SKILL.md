@@ -1,20 +1,19 @@
 ---
 name: newsletter-draft
 description: Write the newsletter text from the verified digest — one section per item — and verify it against the digest.
-version: 0.1.0
+version: 0.2.0
 author: SupportVectors AI Lab
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [Newsletter, Writing, Verifier, Teaching]
+    tags: [Newsletter, Verifier, Teaching]
     related_skills: [research-digest, newsletter-render]
 ---
 
 # Newsletter draft — from digest to prose
 
-Input: `$NEWSLETTER_LAB/runs/<today>/items.json`, already verified by `research-digest`.
-Output: `$NEWSLETTER_LAB/runs/<today>/draft.md`.
+Input: the digest saved by the research step. Output: `draft.md`, saved with `save_draft`.
 
 ## Shape of the draft
 
@@ -24,23 +23,20 @@ Output: `$NEWSLETTER_LAB/runs/<today>/draft.md`.
   ## 1. <the item's title, verbatim>
   Two short paragraphs (40+ words together): what it is, and why it matters to an engineer —
   built from the item's title, summary and `why`. No claims beyond those.
-  <the item's URL, alone on the last line>
+  <the item's url, alone on the last line>
   ```
 - 250–700 words in total. No sign-off, no "as an AI", no apologies.
 
 ## Procedure
 
-1. Read `items.json`. Do not re-fetch anything and do not add items.
-2. Write `draft.md` in the shape above.
-3. **Verify.** Run:
-   `python3 $NEWSLETTER_LAB/tools/verify_draft.py $NEWSLETTER_LAB/runs/<today>/draft.md $NEWSLETTER_LAB/runs/<today>/items.json`
-   On `fail`, repair **only** the sections it names and verify again. Three failures: stop and
-   tell the user what keeps failing.
-4. Reply with the opening paragraph and the path of the draft.
+1. Write the draft in the shape above, from the digest you saved (do not re-fetch, do not add items).
+2. Call `save_draft` with the whole Markdown.
+3. Call `verify_draft`. On `fail`, repair **only** the sections it names, `save_draft` again, verify
+   again. Three failures: stop and tell the user what keeps failing.
+4. Reply with the opening paragraph and where the draft was saved.
 
 ## Rules
 
-- Quote nothing you have not seen. A quotation in the draft must appear in the item's title or
-  summary; otherwise write it as a description, not a quote.
-- Every URL in the draft is one of the five. No others — not even "see also".
-- Do not open the browser or fetch the articles; the draft is written from the digest.
+- Quote nothing you have not seen: a quotation must appear in the item's title or summary,
+  otherwise describe, don't quote.
+- Every url in the draft is one of the five. No others — not even "see also".

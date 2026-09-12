@@ -55,20 +55,18 @@ class _Audit(HTMLParser):
             self.title += data
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("page")
-    ap.add_argument("items")
-    ap.add_argument("--template", default=str(Path(__file__).resolve().parents[1] / "template" / "newsletter.html"))
-    args = ap.parse_args()
+DEFAULT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "template" / "newsletter.html")
+
+
+def verify(page_path: str, items_path: str, template_path: str | None = None) -> dict:
+    """Return the verdict dict (``verdict`` is 'pass' or 'fail')."""
     problems: list[dict] = []
     try:
-        page = Path(args.page).read_text(encoding="utf-8")
-        chosen = json.loads(Path(args.items).read_text(encoding="utf-8"))
-        template = Path(args.template).read_text(encoding="utf-8")
+        page = Path(page_path).read_text(encoding="utf-8")
+        chosen = json.loads(Path(items_path).read_text(encoding="utf-8"))
+        template = Path(template_path or DEFAULT_TEMPLATE).read_text(encoding="utf-8")
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"verdict": "fail", "problems": [{"where": None, "reason": f"cannot read inputs: {e}"}]}))
-        return 1
+        return {"verdict": "fail", "problems": [{"where": None, "reason": f"cannot read inputs: {e}"}]}
     items = chosen.get("items") if isinstance(chosen, dict) else chosen
 
     for ph in sorted(set(PLACEHOLDER.findall(page))):
@@ -107,8 +105,18 @@ def main() -> int:
     verdict = {"verdict": "pass" if not problems else "fail", "articles": len(au.articles), "problems": problems}
     if problems:
         verdict["instruction"] = "Fix ONLY what is named above — do not regenerate the whole page — and run this verifier again."
+    return verdict
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("page")
+    ap.add_argument("items")
+    ap.add_argument("--template", default=DEFAULT_TEMPLATE)
+    args = ap.parse_args()
+    verdict = verify(args.page, args.items, args.template)
     print(json.dumps(verdict, indent=2))
-    return 0 if not problems else 1
+    return 0 if verdict["verdict"] == "pass" else 1
 
 
 if __name__ == "__main__":

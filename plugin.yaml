@@ -1,0 +1,29 @@
+name: newsletter-lab
+version: 0.1.0
+manifest_version: 1
+api_version: 1
+license: MIT
+homepage: https://github.com/supportvectors/newsletter-lab
+author: SupportVectors
+tags: [teaching, verifiers, skills, agents]
+description: >
+  The Newsletter Lab. Three skills -- research five AI items from named sources, draft a short
+  newsletter, render it into the house template -- each of which can fail SILENTLY, and three
+  verifiers (ordinary code holding what the model does not: the fetched pool, the allow-list, the
+  network, the template). /newsletter open runs the skills without verifiers; /newsletter closed
+  runs the same skills with a verifier after every step. Companion to the reliability-lab plugin.
+provides_tools:
+  - fetch_sources
+  - save_digest
+  - verify_research
+  - save_draft
+  - verify_draft
+  - save_page
+  - verify_render
+  - render_page
+provides_hooks:
+  - pre_llm_call
+config_schema:
+  mode: {type: str, default: "open", description: "open (no verifiers), closed (verifier after every step), or off (tools hidden); also set with /newsletter"}
+  open_page: {type: bool, default: true, description: "Open the rendered newsletter in the browser as soon as it is written (the harness does this, not the model)"}
+  run_dir: {type: str, default: "", description: "Where a run's files land; default <hermes home>/plugin-data/newsletter-lab/runs/<date>"}

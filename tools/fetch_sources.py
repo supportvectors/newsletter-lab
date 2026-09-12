@@ -155,38 +155,33 @@ def from_html(src: dict) -> list[dict]:
 FETCHERS = {"rss": from_feed, "atom": from_feed, "hn": from_hn, "html": from_html}
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--sources", default=str(Path(__file__).resolve().parents[1] / "sources.yaml"))
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--window-days", type=int, default=None)
-    ap.add_argument("--only", nargs="*", help="source names to fetch (default: all)")
-    args = ap.parse_args()
-
-    cfg = load_sources(Path(args.sources))
-    window = args.window_days or int(cfg.get("window_days", 14))
+def fetch(out: str, sources: str | None = None, window_days: int | None = None,
+          only: list[str] | None = None, log=None) -> dict:
+    """Fetch every source into ``out`` (candidates.json) and return the written document."""
+    sources = sources or str(Path(__file__).resolve().parents[1] / "sources.yaml")
+    cfg = load_sources(Path(sources))
+    window = window_days or int(cfg.get("window_days", 14))
     cap = int(cfg.get("max_per_source", 12))
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=window)
-    out = {"fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(), "window_days": window,
-           "sources": [], "errors": [], "items": []}
-
+    result = {"fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(), "window_days": window,
+              "sources": [], "errors": [], "items": []}
+    say = log or (lambda m: print(m, file=sys.stderr))
     for src in cfg["sources"]:
-        if args.only and src["name"] not in args.only:
+        if only and src["name"] not in only:
             continue
         try:
             raw = FETCHERS[src["kind"]](src)
         except Exception as e:  # noqa: BLE001 — tolerated on purpose; see module docstring
-            out["errors"].append({"source": src["name"], "error": f"{type(e).__name__}: {e}"[:200]})
-            out["sources"].append({"name": src["name"], "host": src["host"], "items": 0})
-            print(f"  ! {src['name']}: {type(e).__name__}", file=sys.stderr)
+            result["errors"].append({"source": src["name"], "error": f"{type(e).__name__}: {e}"[:200]})
+            result["sources"].append({"name": src["name"], "host": src["host"], "items": 0})
+            say(f"  ! {src['name']}: {type(e).__name__}")
             continue
         kept = []
         for it in raw:
             if not it.get("url") or not it.get("title"):
                 continue
-            if it.get("published"):
-                if dt.datetime.fromisoformat(it["published"]) < cutoff:
-                    continue
+            if it.get("published") and dt.datetime.fromisoformat(it["published"]) < cutoff:
+                continue
             kept.append(it)
         kept.sort(key=lambda x: x.get("published") or "", reverse=True)
         kept = kept[:cap]
@@ -194,12 +189,22 @@ def main() -> int:
             it["id"] = hashlib.sha1(it["url"].encode()).hexdigest()[:10]
             it["source"] = src["name"]
             it["host"] = src["host"]
-        out["items"].extend(kept)
-        out["sources"].append({"name": src["name"], "host": src["host"], "items": len(kept)})
-        print(f"  · {src['name']}: {len(kept)} candidate(s)", file=sys.stderr)
+        result["items"].extend(kept)
+        result["sources"].append({"name": src["name"], "host": src["host"], "items": len(kept)})
+        say(f"  · {src['name']}: {len(kept)} candidate(s)")
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    Path(out).write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return result
 
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text(json.dumps(out, indent=2), encoding="utf-8")
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--sources", default=None)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--window-days", type=int, default=None)
+    ap.add_argument("--only", nargs="*", help="source names to fetch (default: all)")
+    args = ap.parse_args()
+    out = fetch(args.out, sources=args.sources, window_days=args.window_days, only=args.only)
     print(f"{len(out['items'])} candidates from {sum(1 for s in out['sources'] if s['items'])} of "
           f"{len(out['sources'])} sources → {args.out}")
     return 0

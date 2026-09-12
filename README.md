@@ -18,85 +18,78 @@ the room when the model made things up.
 ## What is here
 
 ```
+plugin.yaml, __init__.py  the Hermes plugin: 8 tools, 1 hook, 6 skills, the /newsletter command
+newsletter/               settings, paths, tool handlers, the arming hook, /newsletter
 sources.yaml              the named sources (X, Y, Z…) and the allow-list the verifier derives
-tools/fetch_sources.py    fetch the sources → runs/<date>/candidates.json   (the ledger)
+tools/fetch_sources.py    fetch the sources → candidates.json   (the ledger)
 tools/verify_research.py  verifier 1: five items, all from candidates.json, hosts allowed, links resolve
 tools/verify_draft.py     verifier 2: one section per item, no foreign URLs, no invented quotes
 tools/verify_render.py    verifier 3: no placeholders, CSS intact, every item linked, no scripts
 tools/render.py           the same rendering done by code, not the model (the pipeline-D move)
 template/newsletter.html  the house template
-skills/                   research-digest, newsletter-draft, newsletter-render — each ends by running its verifier
-skills-open/              the same three skills with the verifier step removed — run these FIRST
-tests/                    one test per silent failure the verifiers must catch
+skills/                   research-digest, newsletter-draft, newsletter-render — each ends by calling its verifier
+skills-open/              the same three skills with the verifier step removed
+tests/                    one test per silent failure the verifiers must catch, plus the plugin through Hermes' loader
 ```
 
-## Setup (five minutes)
+The tools the model sees are thin wrappers over the scripts in `tools/` — the same twenty-line
+verifiers you can read and run by hand. `fetch_sources` writes the pool, `save_digest` /
+`save_draft` / `save_page` write the run's files, `verify_research` / `verify_draft` /
+`verify_render` judge them, `render_page` renders by code. The verifiers and `render_page` exist
+only in **closed** mode; in **open** mode the model cannot call them even if it wants to.
 
-You need [Hermes Agent](https://github.com/NousResearch/hermes-agent) with a model configured
-(your own Anthropic, OpenAI or OpenRouter key is fine) and Python 3.9+.
+## Install (two minutes)
+
+You need [Hermes Agent](https://github.com/NousResearch/hermes-agent) with a model configured —
+your own Anthropic, OpenAI or OpenRouter key is fine.
 
 ```bash
-git clone https://github.com/supportvectors/newsletter-lab ~/newsletter-lab
+hermes plugins install supportvectors/newsletter-lab --enable
 ```
 
-Tell Hermes where the skills are, in `~/.hermes/config.yaml`:
-
-```yaml
-skills:
-  external_dirs:
-    - ~/newsletter-lab/skills-open     # this morning
-    # - ~/newsletter-lab/skills        # swap in after lunch
-```
-
-and give the skills the lab's path, in `~/.hermes/.env` (Hermes loads it at start):
+Restart Hermes (Desktop: quit, not just close the window). Then, in any chat:
 
 ```
-NEWSLETTER_LAB=/Users/<you>/newsletter-lab
+/newsletter          # status, and where today's run will land
 ```
 
-Restart Hermes (or Hermes Desktop). If you cloned somewhere else, or skip the `.env` line, the
-skills will ask you for the path once per chat.
-
-Check the fetcher works on your network before class:
-
-```bash
-python3 ~/newsletter-lab/tools/fetch_sources.py --out ~/newsletter-lab/runs/test/candidates.json
-```
-
-You should see one line per source. **Two of them will usually fail** (Anthropic and Meta have no
-feed; the scraper is brittle by design). Notice that the exit code is still 0 and the JSON is
-still valid. Remember that in an hour.
+Nothing else to configure: the plugin knows its own directory, and a run's files land under
+`~/.hermes/plugin-data/newsletter-lab/runs/<date>/` (`/newsletter where` prints it).
 
 ## The afternoon
 
-**Open loop.** With `skills-open` active, in a Hermes chat:
+**Open loop.** In a Hermes chat:
 
 ```
+/newsletter open
 use research-digest-open to gather this week's five items
 use newsletter-draft-open to write the newsletter
 use newsletter-render-open to render it
 ```
 
-Open `runs/<date>/newsletter.html`. Then run the three verifiers by hand on what the agent
-produced:
+The page opens in your browser when it is written. Then run the three verifiers *by hand* on what
+the agent produced — they are scripts, and this is the moment to read them:
 
 ```bash
-cd ~/newsletter-lab && R=runs/$(date +%F)
-python3 tools/verify_research.py $R/items.json $R/candidates.json
-python3 tools/verify_draft.py    $R/draft.md   $R/items.json
-python3 tools/verify_render.py   $R/newsletter.html $R/items.json
+R=~/.hermes/plugin-data/newsletter-lab/runs/$(date +%F)
+L=~/.hermes/plugins/newsletter-lab
+python3 $L/tools/verify_research.py $R/items.json $R/candidates.json
+python3 $L/tools/verify_draft.py    $R/draft.md   $R/items.json
+python3 $L/tools/verify_render.py   $R/newsletter.html $R/items.json
 ```
 
 Read what they say. Then look at the page again.
 
-**Closed loop.** Swap `skills` for `skills-open` in `config.yaml`, restart Hermes, and run the
-three skills again (same prompts, without `-open`). Watch where the retry happens — at the step
-that failed, with the verifier's message naming the one item to fix — and compare the token count
-in your provider's dashboard.
+**Closed loop.** `/newsletter closed`, then the same three prompts without `-open`. Watch where the
+retry happens — at the step that failed, with the verifier's message naming the one item to fix —
+and compare the token count.
 
-**The mechanical step.** Render once more with `python3 tools/render.py $R/draft.md $R/items.json
---out $R/newsletter.html`. Same page, no model, nothing for the verifier to say. Which of the
-three steps *should* have been code all along? Which could never be?
+**The mechanical step.** In closed mode, ask for *the mechanical rendering*: the skill calls
+`render_page`, which fills the same template by code. Same page, no model, nothing for the verifier
+to say. Which of the three steps *should* have been code all along? Which could never be?
+
+`/newsletter show` reopens the latest page; `/newsletter autoopen off` stops pages opening by
+themselves; `/newsletter off` hides the lab's tools from the model.
 
 ## Where the silent failures live
 
@@ -109,8 +102,12 @@ three steps *should* have been code all along? Which could never be?
 ## Tests
 
 ```bash
+uv run pytest tests/          # uv sync installs pytest from the dev group
+# or, without uv:
 pip install pytest && python3 -m pytest tests/
 ```
+
+The tools themselves are standard-library only; any Python 3.9+ runs them, `uv` or not.
 
 ## License
 
