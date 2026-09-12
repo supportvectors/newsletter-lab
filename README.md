@@ -71,6 +71,12 @@ hermes chat -q "say hello"
 
 If the second command does not answer, fix that first — nothing below will work without it.
 
+The lab asks you to **expand tool calls in the transcript**. That UI is in **Hermes
+Desktop** (`hermes desktop` — same install, same config) or the TUI (`hermes --tui`).
+The classic CLI (`hermes` / `hermes --cli`) only prints a short "calling `fetch_sources`…"
+line; there is nothing to expand. If you are staying in the CLI, read the files under
+the run directory instead (see [What to look for at each step](#what-to-look-for-at-each-step)).
+
 **A model that is good with tools.** The lab makes eight tool calls in a row and hands the model
 JSON to copy from. Any current Anthropic, OpenAI or Google model is fine, as is DeepSeek V4.1 Flash
 via OpenRouter (cheap, and what the room will use by default):
@@ -94,7 +100,11 @@ with. A quick check, no Hermes needed:
 python3 -c "import urllib.request;print(urllib.request.urlopen('https://huggingface.co/blog/feed.xml',timeout=15).status)"
 ```
 
-`200` means you are good.
+`200` means you are good. `CERTIFICATE_VERIFY_FAILED` / `unable to get local issuer
+certificate` is not a blocked network: the python.org macOS installer ships without a
+CA bundle. Run **Install Certificates.command** in `/Applications/Python 3.x/` (the
+`x` matches `python3 --version`), then retry the check. Homebrew and `uv` Pythons
+usually already have certificates. See [Troubleshooting](#troubleshooting).
 
 ## Install
 
@@ -183,12 +193,20 @@ the point of the next part.
 
 ### What to look for at each step
 
-**Research.** The first tool call is `fetch_sources`. Expand it in the transcript and read the
-result: it lists every source with a count, and a field `sources_with_nothing`. On most days at
-least one of the ten sources returns nothing (the two scraped index pages, Anthropic and Meta AI,
-fail most often; on a locked-down network several feeds will). The skill tells the model to *say
-which sources contributed nothing and not to fill the gap from memory*. Did it? Watch for three
-behaviours:
+**Research.** The first tool call is `fetch_sources`. In **Desktop** (or `hermes --tui`),
+expand that call in the transcript and read the result: it lists every source with a
+count, and a field `sources_with_nothing`. The classic CLI has no expandable transcript —
+use the files the tools already wrote:
+
+```bash
+R=~/.hermes/plugin-data/newsletter-lab/runs/$(date +%F)/open
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('sources_with_nothing:', [s['name'] for s in d['sources'] if not s['items']]); [print(f\"{s['items']:3}  {s['name']}\") for s in d['sources']]" $R/candidates.json
+```
+
+On most days at least one of the ten sources returns nothing (the two scraped index pages,
+Anthropic and Meta AI, fail most often; on a locked-down network several feeds will). The
+skill tells the model to *say which sources contributed nothing and not to fill the gap
+from memory*. Did it? Watch for three behaviours:
 
 - It names the empty sources and picks five from what came back. Good.
 - It picks five and never mentions the gap. A quiet omission — the reader of the newsletter will
@@ -197,12 +215,14 @@ behaviours:
   silent failure the whole lab is about. Nothing will complain. `save_digest` saves whatever it is
   given.
 
-Also check the `why` field on each item in the `save_digest` call. Is it the model's judgment, or a
+Also check the `why` field on each item in the `save_digest` call (Desktop: expand the
+call; CLI: `python3 -m json.tool $R/items.json`). Is it the model's judgment, or a
 paraphrase of a summary it has not read? Did it copy the title exactly, or "tidy" it?
 
 **Draft.** The draft is Markdown: an opening paragraph, then `## 1. <title>` sections, each ending
-with the item's URL on its own line. Open the `save_draft` call and read the text. Look for direct
-quotations in quotation marks — where would the model have got a quote? It has a title and a
+with the item's URL on its own line. Open the `save_draft` call (CLI: `cat $R/draft.md`)
+and read the text. Look for direct quotations in quotation marks — where would the model
+have got a quote? It has a title and a
 200-character summary. Look for "see also" links or a URL that is not one of the five. Look for
 an item that merged with another, or a sixth that appeared. Look for a chat reply wearing a
 newsletter's clothes ("Here is the newsletter you asked for! …"). Count the sections.
@@ -287,7 +307,9 @@ fix *only* what it names, save again, verify again; give up after three".
 **Where the retry happens.** In the engine lab a failed step was retried at the step. Here you
 should see the same shape: `save_digest` → `verify_research` returns `fail` naming item 3 →
 `save_digest` again with item 3 replaced → `verify_research` returns `pass`. Not a restart from
-`fetch_sources`. Not a rewrite of all five. Expand the tool calls and confirm the repair was local.
+`fetch_sources`. Not a rewrite of all five. In Desktop, expand the tool calls and confirm
+the repair was local; in the CLI, the same sequence is in the chat text and in the files
+under `runs/<date>/closed/`.
 
 **Whether the model obeyed the verifier or argued with it.** The interesting transcripts are the
 ones where the verifier says "URL was not among the fetched candidates" and the model's next move
@@ -400,6 +422,34 @@ restart.
 and the plugin invalidates it when the mode changes. If you still see the wrong list, start a new
 chat; if it persists, `hermes plugins update newsletter-lab` and restart — you may be on a build
 before the invalidation was added.
+
+**`CERTIFICATE_VERIFY_FAILED` / `unable to get local issuer certificate`.** The network
+check (or `fetch_sources`) is using a python.org macOS install that never got a CA
+bundle. The feeds are reachable; Python cannot verify HTTPS. Fix once:
+
+```bash
+# replace 3.13 with the version `python3 --version` reports
+"/Applications/Python 3.13/Install Certificates.command"
+```
+
+Then rerun the Hugging Face check. You want `200`. Homebrew / Xcode / `uv` Pythons
+usually skip this step. Until it is fixed, every `urllib` fetch in the lab fails the
+same way — including the research verifier, which re-fetches each chosen URL.
+
+**No expandable tool call in the CLI.** The README's "expand it in the transcript" means
+the tool-call panel in **Hermes Desktop** or `hermes --tui`. Launch Desktop on top of
+the CLI you already have:
+
+```bash
+hermes desktop
+```
+
+Same `~/.hermes` config, keys, plugins, and sessions. First launch builds the Electron
+app and can take a few minutes. After that, each tool call (`fetch_sources`,
+`save_digest`, the verifiers) is a panel you can open. Quit with ⌘Q when the lab says
+to restart. If you stay in `hermes --cli`, there is nothing to expand: read
+`candidates.json`, `items.json`, `draft.md`, and `newsletter.html` in today's run
+directory instead.
 
 **`fetch_sources` returns errors for most sources.** Your network blocks them. Try from another
 network, or `--only` a subset by hand to see which get through:
